@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✈️ AVIATOR - Crash Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Arial', sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; 
+            overflow-x: hidden;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        /* Header */
+        .header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            background: rgba(0,0,0,0.8); color: white; padding: 20px; border-radius: 20px; 
+            backdrop-filter: blur(10px);
+        }
+        .title { font-size: 2.5rem; text-shadow: 0 0 20px #ff6b6b; }
+        .balance { 
+            font-size: 1.5rem; font-weight: bold; 
+            background: linear-gradient(45deg, #ff6b6b, #ffd93d); 
+            padding: 15px 30px; border-radius: 50px; box-shadow: 0 10px 30px rgba(255,107,107,0.4);
+        }
+        
+        /* Game Canvas */
+        .game-area { 
+            position: relative; height: 500px; margin: 30px 0; 
+            background: linear-gradient(180deg, #87CEEB 0%, #98D8C8 70%, #4a90e2 100%);
+            border-radius: 30px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        canvas { width: 100%; height: 100%; display: block; }
+        
+        /* Multiplier */
+        .multiplier { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: clamp(4rem, 10vw, 8rem); font-weight: bold; 
+            color: #ff6b6b; text-shadow: 0 0 30px #ff6b6b; z-index: 10;
+            transition: all 0.3s ease;
+        }
+        .multiplier.crashed { color: #ff4444; transform: translate(-50%, -50%) scale(1.2); }
+        
+        /* Controls */
+        .controls { 
+            display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin: 40px 0;
+        }
+        input { 
+            padding: 20px 25px; font-size: 1.3rem; border: none; border-radius: 15px; 
+            background: rgba(255,255,255,0.9); box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .btn { 
+            padding: 20px 40px; font-size: 1.3rem; font-weight: bold; border: none; 
+            border-radius: 15px; cursor: pointer; transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .btn-primary { background: linear-gradient(45deg, #ff6b6b, #ff8e8e); color: white; }
+        .btn-primary:hover { transform: translateY(-5px); box-shadow: 0 15px 40px rgba(255,107,107,0.5); }
+        .btn-secondary { background: linear-gradient(45deg, #4ecdc4, #44a08d); color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+        
+        /* Live Bets */
+        .live-bets { 
+            background: rgba(0,0,0,0.85); color: white; padding: 25px; border-radius: 20px;
+            backdrop-filter: blur(15px); margin-top: 30px;
+        }
+        .bets-title { font-size: 1.5rem; margin-bottom: 20px; text-align: center; }
+        .bet-list { max-height: 200px; overflow-y: auto; }
+        .bet-item { 
+            padding: 12px; background: rgba(255,255,255,0.1); margin: 8px 0; 
+            border-radius: 10px; display: flex; justify-content: space-between;
+        }
+        
+        /* Telegram Bot */
+        .telegram-bot { 
+            text-align: center; margin-top: 30px; 
+            background: rgba(0,0,0,0.7); color: white; padding: 20px; border-radius: 15px;
+        }
+        .bot-link { 
+            background: #0088cc; color: white; padding: 15px 30px; 
+            text-decoration: none; border-radius: 25px; font-weight: bold;
+            display: inline-block; margin-top: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .controls { flex-direction: column; align-items: center; }
+            input, .btn { width: 80%; max-width: 300px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1 class="title">✈️ AVIATOR</h1>
+            <div class="balance" id="balance">$1,000.00</div>
+        </div>
+
+        <!-- Game Area -->
+        <div class="game-area">
+            <canvas id="gameCanvas" width="1200" height="500"></canvas>
+            <div class="multiplier" id="multiplier">1.00x</div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <input type="number" id="betAmount" placeholder="Bet Amount" value="10" min="1">
+            <input type="number" id="autoCashout" placeholder="Auto 2.0x" value="2.0" step="0.1" min="1.1">
+            <button class="btn btn-primary" id="betBtn" onclick="placeBet()">🎯 BET</button>
+            <button class="btn btn-secondary" id="cashoutBtn" onclick="cashout()" disabled>💰 CASHOUT</button>
+        </div>
+
+        <!-- Live Bets -->
+        <div class="live-bets">
+            <h3 class="bets-title">🔥 LIVE BETS</h3>
+            <div class="bet-list" id="betList"></div>
+        </div>
+
+        <!-- Telegram Predictor -->
+        <div class="telegram-bot">
+            <h3>🤖 Telegram Predictor Bot</h3>
+            <p>Get AI predictions & signals in real-time!</p>
+            <a href="#" class="bot-link" onclick="alert('Bot: @AviatorPredictorBot\nSend /start')">🚀 Connect Bot</a>
+        </div>
+    </div>
+
+    <script>
+        // Game State
+        let gameState = {
+            multiplier: 1.00,
+            crashed: false,
+            round: 1,
+            balance: 1000,
+            bets: []
+        };
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const multiplierEl = document.getElementById('multiplier');
+        const balanceEl = document.getElementById('balance');
+        const betListEl = document.getElementById('betList');
+
+        // Resize canvas
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Animate Plane
+        function animatePlane(multiplier) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Sky gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(0.7, '#98D8C8');
+            gradient.addColorStop(1, '#4a90e2');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Ground
+            ctx.fillStyle = '#2d5a2d';
+            ctx.fillRect(0, canvas.height * 0.85, canvas.width, canvas.height * 0.15);
+
+            // Plane trajectory
+            const progress = Math.min(multiplier / 15, 1);
+            const x = progress * canvas.width * 0.9;
+            const y = canvas.height * 0.2 - Math.sin(progress * Math.PI * 1.5) * 80;
+
+            // Plane
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(progress * 0.4);
+            ctx.fillStyle = '#ff6b6b';
+            ctx.shadowColor = '#ff6b6b';
+            ctx.shadowBlur = 20;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(35, 12);
+            ctx.lineTo(25, 18);
+            ctx.lineTo(15, 8);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+
+            // Crash explosion
+            if (gameState.crashed) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.fillStyle = 'rgba(255, 69, 0, 0.6)';
+                for(let i = 0; i < 8; i++) {
+                    ctx.beginPath();
+                    ctx.arc(Math.random()*100-50, Math.random()*100-50, 30, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+        }
+
+        // Game Engine
+        let gameInterval;
+        function startRound() {
+            gameState.round++;
+            gameState.multiplier = 1.00;
+            gameState.crashed = false;
+            gameState.bets = [];
+            
+            multiplierEl.textContent = '1.00x';
+            multiplierEl.classList.remove('crashed');
+            document.getElementById('betBtn').disabled = false;
+            document.getElementById('cashoutBtn').disabled = true;
+
+            // Generate crash point (provably fair)
+            const crashPoint = Math.max(1.01, 1 / (1 - Math.random() * 0.99));
+            
+            gameInterval = setInterval(() => {
+                gameState.multiplier += 0.015;
+                
+                multiplierEl.textContent = gameState.multiplier.toFixed(2) + 'x';
+                animatePlane(gameState.multiplier);
+                
+                // Check crash
+                if (gameState.multiplier >= crashPoint) {
+                    crash();
+                }
+            }, 80);
+        }
+
+        function crash() {
+            gameState.crashed = true;
+            multiplierEl.classList.add('crashed');
+            document.getElementById('betBtn').disabled = true;
+            document.getElementById('cashoutBtn').disabled = false;
+            
+            clearInterval(gameInterval);
+            
+            // Pay auto-cashouts
+            gameState.bets.forEach(bet => {
+                if (bet.autoCashout && gameState.multiplier >= bet.autoCashout) {
+                    gameState.balance += bet.amount * gameState.multiplier;
+                }
+            });
+            
+            updateBalance();
+            updateBets();
+            
+            setTimeout(startRound, 4000);
+        }
+
+        // Controls
+        function placeBet() {
+            const amount = parseFloat(document.getElementById('betAmount').value);
+            const auto = parseFloat(document.getElementById('autoCashout').value);
+            
+            if (amount > gameState.balance || gameState.multiplier > 1.01) return;
+            
+            gameState.balance -= amount;
+            gameState.bets.push({
+                id: Date.now(),
+                amount,
+                autoCashout: auto,
+                cashedOut: false
+            });
+            
+            updateBalance();
+            updateBets();
+            document.getElementById('betBtn').disabled = true;
+        }
+
+        function cashout() {
+            // Pay first bet
+            const bet = gameState.bets.find(b => !b.cashedOut);
+            if (bet) {
+                gameState.balance += bet.amount * gameState.multiplier;
+                bet.cashedOut = true;
+                updateBalance();
+                updateBets();
+            }
+        }
+
+        function updateBalance() {
+            balanceEl.textContent = `$${gameState.balance.toFixed(2)}`;
+        }
+
+        function updateBets() {
+            betListEl.innerHTML = gameState.bets.slice(-8).map(bet => `
+                <div class="bet-item">
+                    <span>💰 $${bet.amount}</span>
+                    <span>${bet.cashedOut ? '✅' : '⏳'} ${bet.autoCashout}x</span>
+                </div>
+            `).join('');
+        }
+
+        // Auto-cashout
+        setInterval(() => {
+            if (!gameState.crashed) {
+                gameState.bets.forEach(bet => {
+                    if (!bet.cashedOut && bet.autoCashout && gameState.multiplier >= bet.autoCashout) {
+                        gameState.balance += bet.amount * gameState.multiplier;
+                        bet.cashedOut = true;
+                        updateBalance();
+                    }
+                });
+                updateBets();
+            }
+        }, 100);
+
+        // Start game
+        animatePlane(1.00);
+        setTimeout(startRound, 1000);
+
+        // Telegram Predictor Integration (fake for demo)
+        console.log('🤖 Telegram Bot: Send game data to @AviatorPredictorBot');
+    </script>
+</body>
+</html>
